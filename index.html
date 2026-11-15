@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Applet GeoGebra | Valor medio para integrales</title>
+<script src="https://www.geogebra.org/apps/deployggb.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5fa;color:#1d2b40;font:16px/1.45 Arial,sans-serif}
+main{max-width:1100px;margin:22px auto;padding:0 14px}.card{background:#fff;border:1px solid #dce4ee;border-radius:15px;padding:18px;margin-bottom:15px}
+h1{font-size:clamp(1.4rem,3vw,2rem);margin:0 0 8px}h2{font-size:1.1rem;margin:0 0 12px}
+p{color:#53647a;margin:7px 0}.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+label{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:6px}
+select,input{width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font:inherit}
+input[type=range]{padding:0;accent-color:#1769aa}
+#ggb{width:100%;min-height:510px;overflow:hidden;border:1px solid #dce4ee;border-radius:10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}
+.stat{background:#f4f7fb;border:1px solid #e3eaf2;padding:12px;border-radius:10px}
+.stat small{display:block;color:#586980}.stat strong{display:block;margin-top:5px;overflow-wrap:anywhere}
+.math{background:#f4f7fb;padding:13px;border-radius:9px;font-family:Georgia,serif;font-size:1.08rem}
+#status{font-weight:bold;color:#14784b}.hint{font-size:.9rem}
+@media(max-width:600px){main{margin:9px auto}.card{padding:13px}#ggb{min-height:440px}}
+</style>
+</head>
+<body>
+<main>
+<section class="card">
+<h1>Teorema del valor medio para integrales</h1>
+<p>Explora visualmente la igualdad entre la integral definida y el área de un rectángulo de igual área.</p>
+<p><b>Hipótesis:</b> f es continua en [a,b] y a &lt; b.</p>
+</section>
+
+<section class="card">
+<h2>1. Controles</h2>
+<div class="controls">
+<div><label for="fn">Función f(x)</label>
+<select id="fn">
+<option value="square">x²</option>
+<option value="sine">sen(x)</option>
+<option value="cubic">x³ + x</option>
+<option value="cosine">cos(x) + x/2</option>
+<option value="positive">2 + sen(x)</option>
+</select></div>
+<div><label for="a">Extremo a <output id="av">1.0</output></label>
+<input id="a" type="range" min="-3" max="2.5" step="0.1" value="1"></div>
+<div><label for="b">Extremo b <output id="bv">4.0</output></label>
+<input id="b" type="range" min="-2.5" max="3" step="0.1" value="4"></div>
+<div><label for="view">Mostrar</label>
+<select id="view">
+<option value="both">Área y rectángulo</option>
+<option value="curve">Solo curva y área</option>
+<option value="rectangle">Solo curva y rectángulo</option>
+</select></div>
+</div>
+<p class="hint">Mueve los deslizadores para cambiar el intervalo. Los cálculos y la gráfica se actualizarán automáticamente.</p>
+</section>
+
+<section class="card">
+<h2>2. Gráfica dinámica de GeoGebra</h2>
+<div id="ggb"></div>
+<p class="hint">GeoGebra necesita conexión a Internet para cargar la vista gráfica.</p>
+</section>
+
+<section class="card">
+<h2>3. Resultados y comprobación</h2>
+<div class="stats">
+<div class="stat"><small>Integral definida</small><strong id="ival">—</strong></div>
+<div class="stat"><small>Valor medio μ</small><strong id="mval">—</strong></div>
+<div class="stat"><small>Punto c interior</small><strong id="cval">—</strong></div>
+<div class="stat"><small>Área del rectángulo</small><strong id="rval">—</strong></div>
+</div>
+<div class="math" id="eq" style="margin-top:12px">∫ₐᵇ f(x) dx = μ(b−a)</div>
+<p id="status" aria-live="polite">Cargando GeoGebra…</p>
+</section>
+
+<section class="card">
+<h2>4. ¿Qué representa?</h2>
+<p>El valor medio de la función en [a,b] es</p>
+<div class="math">μ = (1/(b−a)) ∫ₐᵇ f(x) dx.</div>
+<p>Como f es continua, el teorema del valor intermedio garantiza que existe c ∈ (a,b) tal que f(c)=μ. Por tanto:</p>
+<div class="math"><b>∫ₐᵇ f(x) dx = f(c)(b−a).</b></div>
+<p class="hint">El sombreado representa la integral con signo. La búsqueda numérica ilustra un valor de c; la garantía de existencia proviene de la demostración matemática.</p>
+</section>
+<footer class="hint">Proyecto SEA · Didáctica del Cálculo</footer>
+</main>
+<script>
+const el=id=>document.getElementById(id);
+const fun={
+ square:{geo:"x^2",js:x=>x*x},
+ sine:{geo:"sin(x)",js:x=>Math.sin(x)},
+ cubic:{geo:"x^3+x",js:x=>x*x*x+x},
+ cosine:{geo:"cos(x)+x/2",js:x=>Math.cos(x)+x/2},
+ positive:{geo:"2+sin(x)",js:x=>2+Math.sin(x)}
+};
+let api=null,ready=false,last=null;
+function integral(fn,a,b,n=4000){
+ const h=(b-a)/n;let s=fn(a)+fn(b);
+ for(let i=1;i<n;i++)s+=(i%2?4:2)*fn(a+i*h);
+ return s*h/3;
+}
+function findRoots(fn,a,b,target){
+ const roots=[],N=5000;let x0=a,y0=fn(x0)-target;
+ for(let i=1;i<=N;i++){
+  const x1=a+(b-a)*i/N,y1=fn(x1)-target;
+  if(y0*y1<0){
+   let lo=x0,hi=x1,fl=y0;
+   for(let j=0;j<50;j++){const mid=(lo+hi)/2,fm=fn(mid)-target;if(fl*fm<=0)hi=mid;else{lo=mid;fl=fm;}}
+   const r=(lo+hi)/2;
+   if(r>a+1e-7&&r<b-1e-7&&!roots.some(q=>Math.abs(q-r)<1e-5))roots.push(r);
+  }
+  x0=x1;y0=y1;
+ }
+ return roots;
+}
+function ge(cmd){if(api){try{api.evalCommand(cmd);}catch(e){console.warn("GeoGebra command:",cmd,e);}}}
+function setVis(name,visible){if(api){try{api.setVisible(name,visible);}catch(e){}}}
+function update(){
+ let a=+el("a").value,b=+el("b").value;
+ if(b<=a+0.15){b=Math.min(3,a+0.2);el("b").value=b;}
+ el("av").textContent=a.toFixed(1);el("bv").textContent=b.toFixed(1);
+ const selected=fun[el("fn").value],f=selected.js;
+ const I=integral(f,a,b),mu=I/(b-a),roots=findRoots(f,a,b,mu);
+ const c=roots.length?roots.reduce((p,q)=>Math.abs(q-(a+b)/2)<Math.abs(p-(a+b)/2)?q:p):null;
+ const rectangle=mu*(b-a);
+ last={a,b,selected,I,mu,c,rectangle};
+ el("ival").textContent=I.toFixed(6);
+ el("mval").textContent=mu.toFixed(6);
+ el("cval").textContent=c===null?"No localizado":c.toFixed(6);
+ el("rval").textContent=rectangle.toFixed(6);
+ el("eq").textContent=c===null?
+  "Integral ≈ "+I.toFixed(6)+"; μ(b−a) = "+rectangle.toFixed(6):
+  "∫ₐᵇ f(x) dx ≈ "+I.toFixed(6)+" = f("+c.toFixed(6)+")(b−a) ≈ "+rectangle.toFixed(6);
+ el("status").textContent=c===null?
+  "No se detectó numéricamente una intersección interior para este intervalo. Prueba otro intervalo.":
+  "Comprobación: f(c) = "+f(c).toFixed(6)+" y μ = "+mu.toFixed(6)+".";
+ if(ready)updateGraph();
+}
+function updateGraph(){
+ const {a,b,selected,mu,c}=last;
+ // Redefinir los objetos existentes; no borrar objetos inexistentes.
+ ge("f(x) = "+selected.geo);
+ ge("a = "+a.toFixed(8));
+ ge("b = "+b.toFixed(8));
+ ge("mu = "+mu.toFixed(10));
+ ge("areaCurva = Integral(f, a, b)");
+ ge("rectMedio = Polygon((a,0),(b,0),(b,mu),(a,mu))");
+ ge("lineaMedia: y = mu");
+ if(c!==null){
+  ge("puntoC = ("+c.toFixed(10)+", f("+c.toFixed(10)+"))");
+  ge("lineaC: x = "+c.toFixed(10));
+  setVis("puntoC",true);setVis("lineaC",true);
+ }else{setVis("puntoC",false);setVis("lineaC",false);}
+ const v=el("view").value;
+ setVis("areaCurva",v!=="rectangle");
+ setVis("rectMedio",v!=="curve");
+ try{
+  api.setColor("f",24,93,157);api.setLineThickness("f",5);
+  api.setColor("areaCurva",56,145,210);api.setFilling("areaCurva",0.22);
+  api.setColor("rectMedio",224,155,48);api.setFilling("rectMedio",0.28);
+  api.setColor("puntoC",20,145,85);api.setPointSize("puntoC",8);
+  api.setColor("lineaMedia",210,135,25);api.setLineStyle("lineaMedia",2);
+  api.setColor("lineaC",20,145,85);api.setLineStyle("lineaC",2);
+ }catch(e){}
+}
+function boot(){
+ if(typeof GGBApplet==="undefined"){
+  el("status").textContent="No se pudo cargar GeoGebra. Verifica tu conexión a Internet y recarga la página.";return;
+ }
+ const applet=new GGBApplet({
+  appName:"classic",width:1000,height:560,
+  showToolBar:true,showAlgebraInput:true,showMenuBar:true,
+  enableLabelDrags:true,enableShiftDragZoom:true,showResetIcon:true,
+  appletOnLoad:function(ggb){api=ggb;ready=true;update();}
+ },true);
+ applet.inject("ggb");
+}
+["a","b","fn","view"].forEach(id=>el(id).addEventListener("input",update));
+boot();
+</script>
+</body>
+</html>
